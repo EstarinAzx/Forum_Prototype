@@ -1,3 +1,4 @@
+// ====== SECTION 1: SETUP ======
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchWithAuth } from '../lib/api';
@@ -23,10 +24,12 @@ interface Post {
 }
 
 export default function PostDetail() {
+    // ====== SECTION 2: INITIAL STATE & PARAMS ======
     const { id } = useParams<{ id: string }>();
     const [post, setPost] = useState<Post | null>(null);
     const [loading, setLoading] = useState(true);
 
+    // ====== SECTION 3: DATA FETCH FLOW ======
     useEffect(() => {
         if (id) {
             loadPost(id);
@@ -47,6 +50,7 @@ export default function PostDetail() {
         }
     }
 
+    // ====== SECTION 4: RENDERING ======
     if (loading) return <div>Loading...</div>;
     if (!post) return <div>Post not found</div>;
 

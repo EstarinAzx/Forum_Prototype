@@ -1,91 +1,65 @@
-# Supabase + Prisma Setup & Troubleshooting Guide
+# Supabase & Prisma Setup Guide
 
-This guide documents the specific configuration required to connect this project's Prisma backend to a Supabase PostgreSQL database, including workarounds for common issues encountered during development.
+This guide explains how to connect the forum backend to a Supabase PostgreSQL database using Prisma.
 
-## 1. Prerequisites
+## 1. Create Supabase Project
 
-- A Supabase project created at [supabase.com](https://supabase.com).
-- Node.js and npm installed.
+1.  Log in to [Supabase](https://supabase.com/).
+2.  Create a new project.
+3.  **Important:** Note down your database password.
 
-## 2. Connection String Configuration
+## 2. Get Connection String
 
-Supabase provides two types of connection strings: **Transaction Mode** (Pooler) and **Session Mode** (Direct). For Prisma to work correctly with migrations and schema pushes, you generally need the **Direct Connection**.
+1.  Go to **Project Settings** -> **Database**.
+2.  Under **Connection parameters**, find your **Host** (e.g., `db.abcdefg.supabase.co`) and **User** (`postgres`).
+3.  Construct your **Direct Connection String**:
+    ```
+    postgresql://postgres:[YOUR-PASSWORD]@[HOST]:5432/postgres
+    ```
+    *   Replace `[YOUR-PASSWORD]` with your actual password.
+    *   Replace `[HOST]` with your project's host address.
+    *   **Note:** We use port `5432` for the direct connection, which works best for Prisma migrations and general usage in this setup.
 
-### The Correct Format
-In your `backend/.env` file, you need two variables. Note the specific ports and parameters:
+## 3. Configure Backend
 
-```env
-# Connect to Supabase via connection pooling with Supavisor.
-# Uses port 6543 and ?pgbouncer=true flag.
-DATABASE_URL="postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?pgbouncer=true"
+1.  Navigate to the `backend` directory.
+2.  Create or update the `.env` file:
+    ```env
+    DATABASE_URL="postgresql://postgres:yourpassword@db.projectref.supabase.co:5432/postgres"
+    JWT_SECRET="your-secret-key"
+    FRONTEND_URL="http://localhost:5173"
+    ```
 
-# Direct connection to the database. Used for migrations.
-# Uses port 5432.
-DIRECT_URL="postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres"
+## 4. Configure Prisma Schema
+
+Ensure your `prisma/schema.prisma` uses the direct connection:
+
+```prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
 ```
 
-**Crucial Details:**
-- **PROJECT-REF**: Your unique project ID (e.g., `xujysejaploauzmdytxi`).
-- **REGION**: Your project region (e.g., `ap-northeast-1`).
-- **PASSWORD**: Your database password (NOT your Supabase account password).
+## 5. Initialize Database
 
-## 3. Common Issues & Solutions
+Run the following command to create the tables in your Supabase database:
 
-### Issue 1: "Tenant or user not found"
-**Symptoms:** `npx prisma db push` fails with this error.
-**Cause:** Incorrect Project ID or Region in the connection string.
-**Fix:**
-1. Go to Supabase Dashboard -> Settings -> Database.
-2. Verify the **Host** matches your connection string exactly.
-3. Ensure you are using the correct password.
-
-### Issue 2: PowerShell .env Corruption
-**Symptoms:** Connection fails with weird characters in the hostname (e.g., `` `5432`.base.co ``) or "Environment variable not found".
-**Cause:** PowerShell's handling of special characters (like `&` or `?`) when using `echo` or `Out-File` can corrupt the `.env` file encoding or content.
-**Fix:** Use a Node.js script to create the `.env` file cleanly.
-
-Create `create-env.cjs`:
-```javascript
-const fs = require('fs');
-const envContent = `DATABASE_URL="postgresql://..."\nDIRECT_URL="postgresql://..."`;
-fs.writeFileSync('.env', envContent, 'utf8');
+```bash
+npx prisma db push
 ```
-Run it: `node create-env.cjs`
 
-### Issue 3: Prisma Migration Failures
-**Symptoms:** `prisma db push` or `migrate dev` hangs or fails to create tables despite correct credentials.
-**Workaround:** Manually create tables via SQL.
+If this command fails (e.g., due to connection timeouts or specific Supabase restrictions), you can manually create the tables using the SQL Editor in Supabase.
 
-1. Generate the SQL script:
-   ```bash
-   npx prisma migrate dev --name init --create-only
-   ```
-   (Or manually write the SQL matching your schema).
-2. Go to Supabase **SQL Editor**.
-3. Paste and run the SQL to create tables.
-4. Run `npx prisma generate` locally to update the client.
+## 6. Generate Prisma Client
 
-## 4. Final Verification
+After the database schema is pushed, generate the Prisma client:
 
-1. **Generate Client:**
-   ```bash
-   npx prisma generate
-   ```
-2. **Start Backend:**
-   ```bash
-   npm run dev
-   ```
-   Ensure it says "Server running on..." without crashing.
-3. **Test Application:**
-   - Go to the frontend (e.g., `http://localhost:5173`).
-   - Try to **Sign Up**. If successful, the database connection is fully working.
-
-## 5. CORS Configuration (Frontend Port)
-If your frontend starts on a different port (e.g., `5174` instead of `5173`), update `backend/src/index.ts` to allow it:
-
-```typescript
-app.use(cors({
-    origin: [process.env.FRONTEND_URL || 'http://localhost:5173', 'http://localhost:5174'],
-    credentials: true,
-}));
+```bash
+npx prisma generate
 ```
+
+## Troubleshooting
+
+-   **Connection Errors:** Ensure you are using the **Direct Connection** (port 5432) and NOT the transaction pooler (port 6543) for migration commands like `db push`.
+-   **Password:** Double-check your password. Special characters might need URL encoding, but usually, standard passwords work fine.
